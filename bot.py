@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import statistics
 import os
@@ -32,9 +33,9 @@ class LineChangeDetector:
             "1_6": "1st Half Goal Line"
         }
         self.alerts_channels = {
-            "SOFT": SOFT_ALERTS_CHANNEL,
-            "MEDIUM": MEDIUM_ALERTS_CHANNEL,
-            "HARD": HARD_ALERTS_CHANNEL
+            "SOFT": os.getenv("SOFT_ALERTS_CHANNEL"),
+            "MEDIUM": os.getenv("MEDIUM_ALERTS_CHANNEL"),
+            "HARD": os.getenv("HARD_ALERTS_CHANNEL")
         }
 
     def clean_events(self, event_list: list):
@@ -178,6 +179,15 @@ class LineChangeDetector:
         last_processed_value = self.last_processed_ids.get(event_id, {}).get(line_type, {}).get("value", None)
 
         for entry in reversed(recent_data):
+
+            # the following is to bypass the data points
+            # which were within the 150 seconds range from a penalty or red card
+            current_data_time = entry.get("add_time", None)
+            buffer_stop = self.live_event_details.get(event_id, {}).get("buffer_stop", None)
+            if current_data_time is not None and buffer_stop is not None:
+                if current_data_time < buffer_stop:
+                    continue
+
             changes_data = {}
             entry_value = statistics.fmean(
                 map(get_float, entry['handicap'].split(',')))
@@ -224,6 +234,14 @@ class LineChangeDetector:
                     elif line_type == "1_3" or line_type == "1_6":
                         if line_data['over_od'] == '-' or line_data['under_od'] == '-':
                             continue
+
+                    # the following is to bypass the data points
+                    # which were within the 150 seconds range from a penalty or red card
+                    line_data_time = line_data.get("add_time", None)
+                    if line_data_time is not None and buffer_stop is not None:
+                        if line_data_time < buffer_stop:
+                            continue
+
                     time_difference = int(entry['add_time']) - int(line_data['add_time'])
                     if time_difference <= 0:
                         continue
@@ -340,6 +358,7 @@ class LineChangeDetector:
             all_events.append(event_id)
 
             league_name = event.get("league", {}).get("name", None)
+
             # This is added to remove Escoccer games from processing.
             if 'esoccer' in league_name.lower():
                 continue
@@ -369,6 +388,13 @@ class LineChangeDetector:
             except Exception as e:
                 logging.error(f"In Updating Live Event Details | {event} | {e}")
 
+            # This is to avoid processing this event if there was a penalty or red card 150 seconds before now.
+            buffer_stop = self.live_event_details.get(event_id, {}).get("buffer_stop", None)
+            current_time = event.get("time", None)
+            if buffer_stop is not None and current_time is not None:
+                if int(current_time) < int(buffer_stop):
+                    continue
+
             event_count += 1
 
             # Store last goals, penalties, red cards data
@@ -395,12 +421,17 @@ class LineChangeDetector:
                     "penalties", None)
                 if last_processed_penalties is not None and self.live_event_details.get(event_id, {}).get(
                         "penalties", None) is not None:
+                    # this is to avoid processing a event 150 sec from a penalty detection
+                    penalty_time = event.get('time', None)
+                    self.live_event_details[event_id]["buffer_stop"] = int(
+                        penalty_time) + 150 if penalty_time is not None else None
                     logging.info(f"New Penalty Detected, skipping this data set.\n"
                                  f"{self.live_event_details.get(event_id, {}.get('home_team', None))}"
                                  f" v "
                                  f"{self.live_event_details.get(event_id, {}).get('away_team', None)}\n"
                                  f"{self.live_event_details.get(event_id, {}).get('game_time', None)}'")
-                    await line_change_bot.sendMessage(text=f"New Penalty Detected, skipping this data set.\n"
+                    await line_change_bot.sendMessage(text=f"New Penalty Detected, skipping this data set "
+                                                           f"adn the event for next 150 seconds.\n"
                                                            f"{self.live_event_details.get(event_id, {}.get('home_team', None))}"
                                                            f" v "
                                                            f"{self.live_event_details.get(event_id, {}).get('away_team', None)}\n"
@@ -412,12 +443,17 @@ class LineChangeDetector:
                     "red_cards", None)
                 if last_processed_red_cards is not None and self.live_event_details.get(event_id, {}).get(
                         "red_cards", None) is not None:
+                    # This is to stop processing a event 150 secs from red_card_detection
+                    red_card_time = event.get('time', None)
+                    self.live_event_details[event_id]["buffer_stop"] = int(
+                        red_card_time) + 150 if red_card_time is not None else None
                     logging.info(f"New New Red Card Detected, skipping this data set.\n"
                                  f"{self.live_event_details.get(event_id, {}.get('home_team', None))}"
                                  f" v "
                                  f"{self.live_event_details.get(event_id, {}).get('away_team', None)}\n"
                                  f"{self.live_event_details.get(event_id, {}).get('game_time', None)}'")
-                    await line_change_bot.sendMessage(text=f"New Red Card Detected, skipping this data set.\n"
+                    await line_change_bot.sendMessage(text=f"New Red Card Detected, skipping this data set "
+                                                           f"and this event for next 150 seconds.\n"
                                                            f"{self.live_event_details.get(event_id, {}.get('home_team', None))}"
                                                            f" v "
                                                            f"{self.live_event_details.get(event_id, {}).get('away_team', None)}\n"
@@ -430,7 +466,7 @@ class LineChangeDetector:
 
             # Fetch odds data for the event
             odds_data = self.fetch_event_odds(event_id)
-
+            print(event, odds_data)
             # Detect changes for the event
             for line_type in self.line_types.keys():
                 try:
@@ -455,9 +491,6 @@ if __name__ == "__main__":
     LINE_CHANGE_BOT = os.getenv("LINE_CHANGE_BOT")
     t_request = HTTPXRequest(connection_pool_size=25)
     line_change_bot = Bot(token=LINE_CHANGE_BOT, request=t_request)
-    SOFT_ALERTS_CHANNEL = os.getenv("SOFT_ALERTS_CHANNEL")
-    MEDIUM_ALERTS_CHANNEL = os.getenv("MEDIUM_ALERTS_CHANNEL")
-    HARD_ALERTS_CHANNEL = os.getenv("HARD_ALERTS_CHANNEL")
     LOGS_CHANNEL = os.getenv("LOGS_CHANNEL")
 
 
