@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import statistics
-import time
 import os
 from dotenv import load_dotenv
 import requests
@@ -31,6 +30,11 @@ class LineChangeDetector:
             "1_3": "Goal Line",
             "1_5": "1st Half Asian Handicap",
             "1_6": "1st Half Goal Line"
+        }
+        self.alerts_channels = {
+            "SOFT": SOFT_ALERTS_CHANNEL,
+            "MEDIUM": MEDIUM_ALERTS_CHANNEL,
+            "HARD": HARD_ALERTS_CHANNEL
         }
 
     def clean_events(self, event_list: list):
@@ -277,12 +281,15 @@ class LineChangeDetector:
                                                  f"from <b>{next_handicap}</b> -> <b>{current_handicap}</b> " \
                                                  f"in {time_difference}s \n" \
                                                  f"https://betsapi.com/rs/bet365/" \
-                                                 f"{event_id}/{home_team.replace(' ', '-')}-v-{away_team.replace(' ', '-')}"
+                                                 f"{event_id}/{home_team.replace(' ', '-')}" \
+                                                 f"-v-" \
+                                                 f"{away_team.replace(' ', '-')}"
 
                                     changes_data[change_type_flag] = True
 
                                     await line_change_bot.sendMessage(text=change_msg,
-                                                                      chat_id=LINE_ALERTS_CHANNEL,
+                                                                      chat_id=self.alerts_channels.get(change_type_flag,
+                                                                                                       LOGS_CHANNEL),
                                                                       parse_mode='HTML',
                                                                       disable_web_page_preview=True)
                                     changes.append({
@@ -437,7 +444,9 @@ if __name__ == "__main__":
     LINE_CHANGE_BOT = os.getenv("LINE_CHANGE_BOT")
     t_request = HTTPXRequest(connection_pool_size=25)
     line_change_bot = Bot(token=LINE_CHANGE_BOT, request=t_request)
-    LINE_ALERTS_CHANNEL = os.getenv("LINE_ALERTS_CHANNEL")
+    SOFT_ALERTS_CHANNEL = os.getenv("SOFT_ALERTS_CHANNEL")
+    MEDIUM_ALERTS_CHANNEL = os.getenv("MEDIUM_ALERTS_CHANNEL")
+    HARD_ALERTS_CHANNEL = os.getenv("HARD_ALERTS_CHANNEL")
     LOGS_CHANNEL = os.getenv("LOGS_CHANNEL")
 
 
