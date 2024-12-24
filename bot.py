@@ -498,12 +498,11 @@ if __name__ == "__main__":
         while True:
             logging.info("New Loop")
             try:
-                # current_event_count, current_events = asyncio.run(detector.process())
                 current_event_count, current_events = await detector.process()
                 logging.info(f"Events Count: {current_event_count}")
                 logging.info(f"Events List: {current_events}")
                 detector.clean_events(current_events)
-                # asyncio.run(asyncio.sleep(current_event_count + 1))
+                # The following delay between api calls is added to prevent rate limit of 3600 requests / hour
                 await asyncio.sleep(current_event_count + 1)
             except Exception as e:
                 logging.error(e)
