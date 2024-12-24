@@ -190,6 +190,11 @@ class LineChangeDetector:
                 except:
                     game_time = self.live_event_details.get(event_id, {}).get('game_time', '')
 
+                if game_time is None:
+                    game_time = "Prelive"
+                else:
+                    game_time = f"{game_time}'"
+
                 # This is to capture goals data from odds api rather than inplay events api and to avoid processing
                 # fake alerts in case of goals.
                 last_processed_goals = self.last_processed_ids.get(event_id, {}).get("goals", None)
@@ -273,7 +278,7 @@ class LineChangeDetector:
                                     away_team = self.live_event_details.get(event_id, {}).get('away_team', '')
                                     change_msg = f"{change_type_flag} Change\n" \
                                                  f"⚽ {self.live_event_details.get(event_id, {}).get('league', '')}\n" \
-                                                 f"⏱ {game_time}' " \
+                                                 f'⏱ {game_time}' \
                                                  f"{home_team} " \
                                                  f"{'-'.join(self.live_event_details.get(event_id, {}).get('goals', []))} " \
                                                  f"{away_team}\n" \
@@ -339,11 +344,17 @@ class LineChangeDetector:
             if 'esoccer' in league_name.lower():
                 continue
 
+            # Moving away from 2` filter to considering pre - live data too
             try:
                 game_time = event.get("timer", {}).get("tm", None)
-                if int(game_time) < 2:
-                    continue
+                # if int(game_time) < 2 :
+                if game_time is None:
+                    game_time = 'Prelive'
+            except Exception as e:
+                logging.error(f"In Getting Game Time | {event} | e")
+                game_time = None
 
+            try:
                 # Information to be captured and stored here - Id, Name, League, Time, Red Card, Penalties, Goals
                 self.live_event_details[event["id"]] = self.live_event_details.get(event["id"], {})
                 self.live_event_details[event["id"]] = {
@@ -356,7 +367,7 @@ class LineChangeDetector:
                     "red_cards": event.get("stats", {}).get("redcards", None)
                 }
             except Exception as e:
-                logging.error(f"{event} | {e}")
+                logging.error(f"In Updating Live Event Details | {event} | {e}")
 
             event_count += 1
 
