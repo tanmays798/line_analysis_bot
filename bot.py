@@ -306,18 +306,34 @@ class LineChangeDetector:
 
                                     home_team = self.live_event_details.get(event_id, {}).get('home_team', '')
                                     away_team = self.live_event_details.get(event_id, {}).get('away_team', '')
-                                    change_msg = f"⚽ {self.live_event_details.get(event_id, {}).get('league', '')}\n" \
-                                                 f'⏱ {game_time} ' \
-                                                 f"{home_team} " \
-                                                 f"{'-'.join(self.live_event_details.get(event_id, {}).get('goals', []))} " \
-                                                 f"{away_team}\n" \
-                                                 f"<b>{self.line_types[line_type]}</b> " \
-                                                 f"from <b>{next_handicap}</b> -> <b>{current_handicap}</b> " \
-                                                 f"in {time_difference}s \n" \
-                                                 f"https://betsapi.com/rs/bet365/" \
-                                                 f"{event_id}/{home_team.replace(' ', '-')}" \
-                                                 f"-v-" \
-                                                 f"{away_team.replace(' ', '-')}"
+                                    if game_time != "Prelive":
+                                        change_msg = f"⚽ {self.live_event_details.get(event_id, {}).get('league', '')}\n" \
+                                                     f'⏱ {game_time} ' \
+                                                     f"{home_team} " \
+                                                     f"{'-'.join(self.live_event_details.get(event_id, {}).get('goals', []))} " \
+                                                     f"{away_team}\n" \
+                                                     f"<b>{self.line_types[line_type]}</b> " \
+                                                     f"from <b>{next_handicap}</b> -> <b>{current_handicap}</b> " \
+                                                     f"in {time_difference}s \n" \
+                                                     f"https://betsapi.com/rs/bet365/" \
+                                                     f"{event_id}/{home_team.replace(' ', '-')}" \
+                                                     f"-v-" \
+                                                     f"{away_team.replace(' ', '-')}"
+                                    else:
+                                        change_msg = f"Prelive🔜\n" \
+                                                     f"⚽ {self.live_event_details.get(event_id, {}).get('league', '')}\n" \
+                                                     f'⏱ ' \
+                                                     f"{home_team} " \
+                                                     f"{'-'.join(self.live_event_details.get(event_id, {}).get('goals', []))} " \
+                                                     f"{away_team}\n" \
+                                                     f"<b>{self.line_types[line_type]}</b> " \
+                                                     f"from <b>{next_handicap}</b> -> <b>{current_handicap}</b> " \
+                                                     f"in {time_difference}s \n" \
+                                                     f"https://betsapi.com/rs/bet365/" \
+                                                     f"{event_id}/{home_team.replace(' ', '-')}" \
+                                                     f"-v-" \
+                                                     f"{away_team.replace(' ', '-')}"
+
 
                                     changes_data[change_type_flag] = True
 
