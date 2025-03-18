@@ -86,7 +86,10 @@ class LineChangeDetector:
                 if event_data_var['home_od'] == '-' or event_data_var['away_od'] == '-':
                     return -1
             elif line_type_var == "1_3" or line_type_var == "1_6":
-                return -1
+                if event_data_var['over_od'] == '-' or event_data_var['under_od'] == '-':
+                    return -1
+                else:
+                    return 1
             else:
                 return 1
 
