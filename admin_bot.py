@@ -16,6 +16,9 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+#for use of pagination
+ITEMS_PER_PAGE = 10
+
 
 def is_admin(user_id: int) -> bool:
     """Check if the user ID is in the admins list."""
@@ -113,25 +116,55 @@ async def blacklist_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-async def view_blacklist_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle the /view_blacklist command to show all blacklisted leagues."""
+async def view_blacklist_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 1):
+    """Show a paginated view of the blacklist with inline unban buttons."""
     user_id = update.effective_user.id
     if not is_admin(user_id):
         await update.message.reply_text("You do not have permission to use this command.")
         return
 
-    blacklist = get_blacklist()
-    if not blacklist:
-        await update.message.reply_text("The blacklist is empty.")
-        return
-    
-    keyboard = [
-        [InlineKeyboardButton(f"Unban '{league}'", callback_data=f"confirm_unban:{league}")]
-        for league in sorted(blacklist)
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    blacklist = sorted(get_blacklist())
+    total_items = len(blacklist)
+    total_pages = max(1, (total_items + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
 
-    await update.message.reply_text("Blacklisted leagues:", reply_markup=reply_markup)
+    if page < 1 or page > total_pages:
+        await update.message.reply_text("Invalid page number.")
+        return
+
+    start = (page - 1) * ITEMS_PER_PAGE
+    end = start + ITEMS_PER_PAGE
+    page_items = blacklist[start:end]
+
+    keyboard = []
+    for league in page_items:
+        keyboard.append([
+            InlineKeyboardButton(f"🏷️ {league}", callback_data="noop"),
+            InlineKeyboardButton("❌ Unban", callback_data=f"confirm_unban:{league}")
+        ])
+
+    # Pagination buttons
+    nav_buttons = []
+    if page > 1:
+        nav_buttons.append(InlineKeyboardButton("⏮ Prev", callback_data=f"page:{page - 1}"))
+    if page < total_pages:
+        nav_buttons.append(InlineKeyboardButton("⏭ Next", callback_data=f"page:{page + 1}"))
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        f"Blacklisted leagues (page {page}/{total_pages}):",
+        reply_markup=reply_markup
+    )
+
+async def view_blacklist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await view_blacklist_handler(update, context, page=1)
+
+# Optional: handle noop to silently ignore disabled buttons
+# (league name buttons are clickable but do nothing)
+async def noop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.answer()
+
 
 async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle inline button clicks (e.g. unban league)."""
@@ -168,6 +201,14 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
         else:
             await query.edit_message_text(f"❌ '{league}' was not found in the blacklist.")
 
+    elif data.startswith("page:"):
+        try:
+            page_num = int(data.split("page:")[1])
+            # re-use the view function for the new page
+            await view_blacklist_handler(update, context, page=page_num)
+        except ValueError:
+            await query.edit_message_text("Invalid page number.")
+
     elif data == "cancel_unban":
         await query.edit_message_text("❌ Unban cancelled.")
 
@@ -202,10 +243,11 @@ if __name__ == "__main__":
     # Add command handlers
     app.add_handler(CommandHandler("start", start_handler))
     app.add_handler(CommandHandler("blacklist", blacklist_handler))
-    app.add_handler(CommandHandler("view_blacklist", view_blacklist_handler))
+    app.add_handler(CommandHandler("view_blacklist", view_blacklist_command))
     app.add_handler(CommandHandler("unban", unban_handler))
     app.add_handler(CommandHandler("clear_blacklist", clear_blacklist_handler))
     app.add_handler(CallbackQueryHandler(callback_query_handler))
+    app.add_handler(CallbackQueryHandler(noop_handler, pattern="^noop$"))
 
 
 
