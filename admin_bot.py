@@ -105,7 +105,7 @@ async def blacklist_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await update.message.reply_text("Usage: /ban <league_name>")
+        await update.message.reply_text("Usage: /blacklist <league_name>")
         return
 
     league_name_input = " ".join(context.args).strip()
@@ -218,7 +218,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /start command."""
     await update.message.reply_text(
         "Welcome to the Blacklist Bot! Use:\n"
-        "/ban <league_name> - add a league to the blacklist\n"
+        "/blacklist <league_name> - add a league to the blacklist\n"
         "/unban <league_name> - remove a league from the blacklist\n"
         "/view_blacklist - see all blacklisted leagues\n"
         "/clear_blacklist - wipe the blacklist (admin only)"
