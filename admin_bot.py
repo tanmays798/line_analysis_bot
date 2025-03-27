@@ -158,7 +158,9 @@ async def view_blacklist_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 async def view_blacklist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["blacklist_page"] = 1
     await view_blacklist_handler(update, context, page=1)
+
 
 # Optional: handle noop to silently ignore disabled buttons
 # (league name buttons are clickable but do nothing)
@@ -196,18 +198,29 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
     elif data.startswith("do_unban:"):
         league = data.split("do_unban:")[1]
         removed = remove_from_blacklist(league)
+
+        # Figure out which page we were on by saving it in context (optional fallback to 1)
+        page = context.user_data.get("blacklist_page", 1)
+
         if removed:
-            await query.edit_message_text(f"✅ '{league}' has been removed from the blacklist.")
+            # Delete the old message and send a refreshed one
+            try:
+                await query.delete_message()
+            except:
+                pass  # Just in case it's already gone
+            await view_blacklist_handler(update, context, page=page)
         else:
             await query.edit_message_text(f"❌ '{league}' was not found in the blacklist.")
+
 
     elif data.startswith("page:"):
         try:
             page_num = int(data.split("page:")[1])
-            # re-use the view function for the new page
+            context.user_data["blacklist_page"] = page_num  # Save it
             await view_blacklist_handler(update, context, page=page_num)
         except ValueError:
             await query.edit_message_text("Invalid page number.")
+
 
     elif data == "cancel_unban":
         await query.edit_message_text("❌ Unban cancelled.")
