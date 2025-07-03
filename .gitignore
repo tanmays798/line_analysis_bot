@@ -38,4 +38,7 @@ ENV/
 # Logs
 *.log
 
+#files
+football_drops.py
+
 
